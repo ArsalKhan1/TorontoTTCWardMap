@@ -11,11 +11,10 @@ html, body {
   background: #e0e0e0;
 }
 
+/* #search-box and #legend are pushed into Google Maps' control stack by
+   app.js, so Maps positions them itself — they only need their own look. */
 #search-box {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  z-index: 10;
+  margin: 12px;
   background: white;
   padding: 8px;
   border-radius: 4px;
@@ -38,10 +37,7 @@ html, body {
 }
 
 #legend {
-  position: absolute;
-  bottom: 24px;
-  left: 12px;
-  z-index: 10;
+  margin: 12px;
   background: white;
   padding: 10px 12px;
   border-radius: 4px;

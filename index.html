@@ -10,11 +10,12 @@
   <div id="map"></div>
 
   <div id="search-box">
-    <input id="search-input" type="text" placeholder="Search an address in Toronto" />
+    <input id="search-input" type="text" placeholder="Search an address in Toronto"
+           aria-label="Search an address in Toronto" />
     <div id="search-error" class="hidden">Address not found.</div>
   </div>
 
-  <div id="legend">
+  <div id="legend" role="group" aria-label="Map layers">
     <label><input type="checkbox" data-layer="wards" checked /> Ward boundaries</label>
     <label><input type="checkbox" data-layer="bus" checked /> Bus routes</label>
     <label><input type="checkbox" data-layer="streetcar" checked /> Streetcar routes</label>
