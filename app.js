@@ -60,6 +60,53 @@ function initLegend() {
   });
 }
 
+let searchMarker = null;
+
+function initSearch(map) {
+  const input = document.getElementById('search-input');
+  const errorEl = document.getElementById('search-error');
+
+  const autocomplete = new google.maps.places.Autocomplete(input, {
+    bounds: new google.maps.LatLngBounds(
+      { lat: 43.581, lng: -79.639 }, // Toronto bounding box, southwest corner
+      { lat: 43.855, lng: -79.116 }  // Toronto bounding box, northeast corner
+    ),
+    strictBounds: false,
+  });
+
+  autocomplete.addListener('place_changed', () => {
+    const place = autocomplete.getPlace();
+    if (!place.geometry || !place.geometry.location) {
+      errorEl.classList.remove('hidden');
+      return;
+    }
+    errorEl.classList.add('hidden');
+
+    map.panTo(place.geometry.location);
+    map.setZoom(16);
+
+    if (searchMarker) {
+      searchMarker.setMap(null);
+    }
+    searchMarker = new google.maps.Marker({
+      map,
+      position: place.geometry.location,
+    });
+  });
+
+  input.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    // place_changed only fires when a dropdown suggestion is selected. A
+    // bare Enter with no selection means getPlace() has no geometry —
+    // treat that as "address not found".
+    event.preventDefault();
+    const place = autocomplete.getPlace();
+    if (!place || !place.geometry) {
+      errorEl.classList.remove('hidden');
+    }
+  });
+}
+
 function initMap() {
   map = new google.maps.Map(document.getElementById('map'), {
     center: TORONTO_CENTER,
@@ -73,6 +120,7 @@ function initMap() {
   });
 
   initLegend();
+  initSearch(map);
 }
 
 function loadGoogleMapsScript() {
