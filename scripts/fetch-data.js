@@ -32,22 +32,37 @@ function parseCsv(text) {
   return parse(text, { columns: true, skip_empty_lines: true });
 }
 
+// adm-zip's readAsText returns "" for an entry that doesn't exist rather than
+// throwing, which would silently produce empty-but-valid output files. Fail
+// loudly instead, and name what the zip actually contains.
+function readCsvEntry(zip, name) {
+  const text = zip.readAsText(name);
+  if (!text) {
+    const entries = zip.getEntries().map((e) => e.entryName).join(', ');
+    throw new Error(`GTFS zip has no readable ${name} (entries found: ${entries})`);
+  }
+  return parseCsv(text);
+}
+
 async function fetchWards() {
   const pkg = await fetchJson(WARDS_PACKAGE_URL);
   const resource = pkg.result.resources.find(
-    (r) => r.format.toUpperCase() === 'GEOJSON' && r.name.includes('4326')
+    (r) => (r.format || '').toUpperCase() === 'GEOJSON' && (r.name || '').includes('4326')
   );
   if (!resource) {
     throw new Error('Could not find a WGS84 (4326) GeoJSON resource for city-wards');
   }
   const geojson = await fetchJson(resource.url);
-  fs.writeFileSync(path.join(DATA_DIR, 'wards.geojson'), JSON.stringify(geojson, null, 2));
+  if (!Array.isArray(geojson.features) || geojson.features.length === 0) {
+    throw new Error('Ward GeoJSON has no features — refusing to write an empty wards.geojson');
+  }
+  fs.writeFileSync(path.join(DATA_DIR, 'wards.geojson'), JSON.stringify(geojson));
   console.log(`Wrote data/wards.geojson (${geojson.features.length} features)`);
 }
 
 async function fetchRoutes() {
   const pkg = await fetchJson(GTFS_PACKAGE_URL);
-  const resource = pkg.result.resources.find((r) => r.format.toUpperCase() === 'ZIP');
+  const resource = pkg.result.resources.find((r) => (r.format || '').toUpperCase() === 'ZIP');
   if (!resource) {
     throw new Error('Could not find the GTFS zip resource for ttc-routes-and-schedules');
   }
@@ -55,16 +70,24 @@ async function fetchRoutes() {
   const zipBuffer = await fetchBuffer(resource.url);
   const zip = new AdmZip(zipBuffer);
 
-  const routes = parseCsv(zip.readAsText('routes.txt'));
-  const trips = parseCsv(zip.readAsText('trips.txt'));
-  const shapes = parseCsv(zip.readAsText('shapes.txt'));
+  const routes = readCsvEntry(zip, 'routes.txt');
+  const trips = readCsvEntry(zip, 'trips.txt');
+  const shapes = readCsvEntry(zip, 'shapes.txt');
 
   const layers = groupRoutesByLayer({ routes, trips, shapes });
 
   for (const [layer, features] of Object.entries(layers)) {
+    if (features.length === 0) {
+      throw new Error(
+        `No ${layer} routes found in the GTFS feed — refusing to write an empty routes-${layer}.geojson`
+      );
+    }
+  }
+
+  for (const [layer, features] of Object.entries(layers)) {
     const geojson = { type: 'FeatureCollection', features };
     const outPath = path.join(DATA_DIR, `routes-${layer}.geojson`);
-    fs.writeFileSync(outPath, JSON.stringify(geojson, null, 2));
+    fs.writeFileSync(outPath, JSON.stringify(geojson));
     console.log(`Wrote data/routes-${layer}.geojson (${features.length} features)`);
   }
 }
