@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Toronto TTC Ward Map</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="map"></div>
+
+  <div id="search-box">
+    <input id="search-input" type="text" placeholder="Search an address in Toronto" />
+    <div id="search-error" class="hidden">Address not found.</div>
+  </div>
+
+  <div id="legend">
+    <label><input type="checkbox" data-layer="wards" checked /> Ward boundaries</label>
+    <label><input type="checkbox" data-layer="bus" checked /> Bus routes</label>
+    <label><input type="checkbox" data-layer="streetcar" checked /> Streetcar routes</label>
+    <label><input type="checkbox" data-layer="subway" checked /> Subway lines</label>
+  </div>
+
+  <div id="layer-error-banner" class="hidden">Some map layers failed to load.</div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
