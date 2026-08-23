@@ -4,7 +4,7 @@
   "private": true,
   "description": "Toronto ward boundaries and TTC transit routes overlaid on Google Maps",
   "scripts": {
-    "test": "node --test scripts/lib/*.test.js",
+    "test": "node --test scripts/lib/",
     "fetch-data": "node scripts/fetch-data.js"
   },
   "dependencies": {

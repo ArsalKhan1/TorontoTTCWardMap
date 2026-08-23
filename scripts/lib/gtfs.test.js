@@ -102,3 +102,41 @@ test('groupRoutesByLayer groups routes into bus/streetcar/subway with representa
   const allRouteIds = [...layers.bus, ...layers.streetcar, ...layers.subway].map((f) => f.properties.route_id);
   assert.equal(allRouteIds.includes('999'), false);
 });
+
+test('groupRoutesByLayer drops a route that has no trips at all', () => {
+  const routes = [
+    { route_id: '900', route_short_name: '900', route_long_name: 'Airport Express', route_type: '3', route_color: '' },
+  ];
+  const layers = groupRoutesByLayer({ routes, trips: [], shapes: [] });
+  assert.deepEqual(layers, { bus: [], streetcar: [], subway: [] });
+});
+
+test('groupRoutesByLayer ignores trips with an empty or missing shape_id', () => {
+  const routes = [
+    { route_id: '7', route_short_name: '7', route_long_name: 'Bathurst', route_type: '3', route_color: '' },
+  ];
+  const trips = [
+    { route_id: '7', shape_id: '' },
+    { route_id: '7' }, // shape_id column absent entirely
+  ];
+  const shapes = [
+    { shape_id: '', shape_pt_lat: '43.6', shape_pt_lon: '-79.4', shape_pt_sequence: '1' },
+    { shape_id: '', shape_pt_lat: '43.61', shape_pt_lon: '-79.41', shape_pt_sequence: '2' },
+  ];
+  // Both trips are skipped, so the route has no usable shape and is dropped.
+  const layers = groupRoutesByLayer({ routes, trips, shapes });
+  assert.equal(layers.bus.length, 0);
+});
+
+test('groupRoutesByLayer drops a route whose best shape has only one point', () => {
+  const routes = [
+    { route_id: '1', route_short_name: '1', route_long_name: 'Yonge-University', route_type: '1', route_color: 'F8C300' },
+  ];
+  const trips = [{ route_id: '1', shape_id: 'shape-1-a' }];
+  const shapes = [
+    { shape_id: 'shape-1-a', shape_pt_lat: '43.7', shape_pt_lon: '-79.5', shape_pt_sequence: '1' },
+  ];
+  // A LineString needs at least 2 positions, so this route is excluded.
+  const layers = groupRoutesByLayer({ routes, trips, shapes });
+  assert.equal(layers.subway.length, 0);
+});
