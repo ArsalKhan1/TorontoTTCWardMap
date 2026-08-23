@@ -49,6 +49,17 @@ async function loadAllLayers(map) {
   return failedLayers;
 }
 
+function initLegend() {
+  document.querySelectorAll('#legend input[data-layer]').forEach((checkbox) => {
+    checkbox.addEventListener('change', () => {
+      const key = checkbox.dataset.layer;
+      const layer = mapLayers[key];
+      if (!layer) return;
+      layer.setMap(checkbox.checked ? map : null);
+    });
+  });
+}
+
 function initMap() {
   map = new google.maps.Map(document.getElementById('map'), {
     center: TORONTO_CENTER,
@@ -60,6 +71,8 @@ function initMap() {
       document.getElementById('layer-error-banner').classList.remove('hidden');
     }
   });
+
+  initLegend();
 }
 
 function loadGoogleMapsScript() {
