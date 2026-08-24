@@ -11,10 +11,10 @@ html, body {
   background: #e0e0e0;
 }
 
-/* #search-box and #legend are pushed into Google Maps' control stack by
-   app.js, so Maps positions them itself — they only need their own look. */
+/* #search-box and #legend are pushed into Leaflet's own control stack by
+   app.js (which adds the "leaflet-control" class to them there), so
+   Leaflet positions and spaces them itself — they only need their own look. */
 #search-box {
-  margin: 12px;
   background: white;
   padding: 8px;
   border-radius: 4px;
@@ -37,7 +37,6 @@ html, body {
 }
 
 #legend {
-  margin: 12px;
   background: white;
   padding: 10px 12px;
   border-radius: 4px;
