@@ -11,11 +11,32 @@ const DATA_FILES = {
 };
 
 const LAYER_STYLES = {
-  wards: { color: '#4a90d9', weight: 1.5, fillColor: '#4a90d9', fillOpacity: 0.08 },
   bus: { color: '#00923f', weight: 1.5 },
   streetcar: { color: '#d3242c', weight: 2 },
   subway: { color: '#f8c300', weight: 3 },
 };
+
+const WARD_COUNT = 25;
+
+// Toronto's 25 wards have no official color scheme, so this generates one:
+// evenly-spaced hues around the color wheel, keyed off each ward's stable
+// AREA_SHORT_CODE ("01".."25") so the same ward always gets the same color
+// on every load, not a random one.
+function wardColor(shortCode) {
+  const index = parseInt(shortCode, 10) - 1;
+  const hue = Math.round((360 / WARD_COUNT) * index);
+  return `hsl(${hue}, 65%, 55%)`;
+}
+
+function wardStyle(feature) {
+  const color = wardColor(feature.properties.AREA_SHORT_CODE);
+  return { color, weight: 1.5, fillColor: color, fillOpacity: 0.35 };
+}
+
+function labelWardFeature(feature, layer) {
+  const label = String(parseInt(feature.properties.AREA_SHORT_CODE, 10));
+  layer.bindTooltip(label, { permanent: true, direction: 'center', className: 'ward-label' });
+}
 
 const TORONTO_CENTER = { lat: 43.6532, lng: -79.3832 };
 
@@ -51,6 +72,9 @@ function styleForLayer(key) {
       weight: LAYER_STYLES.subway.weight,
     });
   }
+  if (key === 'wards') {
+    return wardStyle;
+  }
   return LAYER_STYLES[key];
 }
 
@@ -74,7 +98,11 @@ async function loadLayer(map, key) {
     throw new Error(`Failed to fetch ${DATA_FILES[key]}: ${response.status}`);
   }
   const geojson = await response.json();
-  const dataLayer = L.geoJSON(geojson, { style: styleForLayer(key), pane: key });
+  const layerOptions = { style: styleForLayer(key), pane: key };
+  if (key === 'wards') {
+    layerOptions.onEachFeature = labelWardFeature;
+  }
+  const dataLayer = L.geoJSON(geojson, layerOptions);
   // The layer may have been toggled off while it was still loading, so honour
   // the checkbox's current state instead of always attaching. Layers default
   // to visible if the checkbox isn't present for any reason.

@@ -94,3 +94,26 @@ html, body {
 .hidden {
   display: none;
 }
+
+/* Permanent ward-number labels (Leaflet tooltips bound to each ward
+   polygon). No box/arrow — just bold text with a white halo so it stays
+   readable over any of the 25 ward fill colors, and it never intercepts
+   clicks/drags meant for the map underneath. */
+.ward-label {
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  font-weight: 700;
+  font-size: 13px;
+  color: #1a1a1a;
+  text-shadow:
+    0 0 3px #fff,
+    0 0 3px #fff,
+    0 0 3px #fff;
+  pointer-events: none;
+}
+
+.ward-label::before {
+  display: none; /* remove Leaflet's default tooltip arrow */
+}
