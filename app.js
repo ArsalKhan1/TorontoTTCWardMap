@@ -19,6 +19,22 @@ const LAYER_STYLES = {
 
 const TORONTO_CENTER = { lat: 43.6532, lng: -79.3832 };
 
+const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
+const TORONTO_VIEWBOX = '-79.639,43.855,-79.116,43.581'; // left,top,right,bottom
+const SEARCH_DEBOUNCE_MS = 300;
+const SEARCH_MIN_CHARS = 3;
+
+function buildNominatimUrl(query) {
+  const params = new URLSearchParams({
+    format: 'json',
+    q: query,
+    viewbox: TORONTO_VIEWBOX,
+    bounded: '1',
+    limit: '5',
+  });
+  return `${NOMINATIM_URL}?${params.toString()}`;
+}
+
 let map;
 const mapLayers = {};
 
@@ -87,6 +103,139 @@ function initLegend() {
   });
 }
 
+let searchMarker = null;
+let searchDebounceTimer = null;
+let searchRequestToken = 0;
+
+function initSearch(map) {
+  const input = document.getElementById('search-input');
+  const errorEl = document.getElementById('search-error');
+  const resultsEl = document.getElementById('search-results');
+
+  let currentResults = [];
+  let activeIndex = -1;
+
+  const showError = () => {
+    errorEl.classList.remove('hidden');
+  };
+
+  const hideError = () => {
+    errorEl.classList.add('hidden');
+  };
+
+  const clearResults = () => {
+    currentResults = [];
+    activeIndex = -1;
+    resultsEl.innerHTML = '';
+    resultsEl.classList.add('hidden');
+  };
+
+  const selectResult = (result) => {
+    hideError();
+    clearResults();
+    input.value = result.display_name;
+
+    const lat = Number(result.lat);
+    const lon = Number(result.lon);
+    map.setView([lat, lon], 16);
+
+    if (searchMarker) {
+      map.removeLayer(searchMarker);
+    }
+    searchMarker = L.marker([lat, lon]).addTo(map);
+  };
+
+  const highlightActive = () => {
+    Array.from(resultsEl.children).forEach((li, i) => {
+      li.classList.toggle('active', i === activeIndex);
+    });
+  };
+
+  const renderResults = (results) => {
+    currentResults = results;
+    activeIndex = -1;
+    resultsEl.innerHTML = '';
+    if (results.length === 0) {
+      resultsEl.classList.add('hidden');
+      return;
+    }
+    results.forEach((result) => {
+      const li = document.createElement('li');
+      li.textContent = result.display_name;
+      li.addEventListener('click', () => selectResult(result));
+      resultsEl.appendChild(li);
+    });
+    resultsEl.classList.remove('hidden');
+  };
+
+  const runSearch = async (query) => {
+    const token = ++searchRequestToken;
+    try {
+      const response = await fetch(buildNominatimUrl(query));
+      if (!response.ok) {
+        throw new Error(`Nominatim request failed: ${response.status}`);
+      }
+      const results = await response.json();
+      if (token !== searchRequestToken) return; // a newer keystroke superseded this request
+      if (results.length === 0) {
+        clearResults();
+        showError();
+        return;
+      }
+      hideError();
+      renderResults(results);
+    } catch (err) {
+      if (token !== searchRequestToken) return;
+      console.error(err);
+      clearResults();
+      showError();
+    }
+  };
+
+  input.addEventListener('input', () => {
+    hideError();
+    clearResults();
+    clearTimeout(searchDebounceTimer);
+    const query = input.value.trim();
+    if (query.length < SEARCH_MIN_CHARS) return;
+    searchDebounceTimer = setTimeout(() => runSearch(query), SEARCH_DEBOUNCE_MS);
+  });
+
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown' && currentResults.length > 0) {
+      event.preventDefault();
+      activeIndex = (activeIndex + 1) % currentResults.length;
+      highlightActive();
+      return;
+    }
+    if (event.key === 'ArrowUp' && currentResults.length > 0) {
+      event.preventDefault();
+      activeIndex = (activeIndex - 1 + currentResults.length) % currentResults.length;
+      highlightActive();
+      return;
+    }
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    clearTimeout(searchDebounceTimer);
+    if (activeIndex >= 0 && currentResults[activeIndex]) {
+      selectResult(currentResults[activeIndex]);
+      return;
+    }
+    const query = input.value.trim();
+    if (!query || query.length < SEARCH_MIN_CHARS) {
+      showError();
+      return;
+    }
+    runSearch(query);
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!resultsEl.contains(event.target) && event.target !== input) {
+      clearResults();
+    }
+  });
+}
+
 function addDomAsControl(position, elementId) {
   const control = L.control({ position });
   control.onAdd = () => {
@@ -122,6 +271,7 @@ function initMap() {
   });
 
   initLegend();
+  initSearch(map);
 }
 
 initMap();

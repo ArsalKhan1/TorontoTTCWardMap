@@ -14,7 +14,8 @@
 
   <div id="search-box">
     <input id="search-input" type="text" placeholder="Search an address in Toronto"
-           aria-label="Search an address in Toronto" />
+           aria-label="Search an address in Toronto" autocomplete="off" />
+    <ul id="search-results" class="hidden"></ul>
     <div id="search-error" class="hidden">Address not found.</div>
   </div>
 
