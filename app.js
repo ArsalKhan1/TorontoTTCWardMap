@@ -54,13 +54,27 @@ function styleForLayer(key) {
   return LAYER_STYLES[key];
 }
 
+// Named panes give the four overlays a deterministic paint order regardless
+// of which layer's fetch happens to finish first — without this, paint order
+// follows Promise.all completion order, which varies between page loads.
+// Higher zIndex paints on top; Leaflet's default overlay pane is 400, so
+// these all sit at or above that.
+const PANE_Z_INDEXES = { wards: 400, bus: 410, streetcar: 420, subway: 430 };
+
+function initPanes(map) {
+  Object.entries(PANE_Z_INDEXES).forEach(([key, zIndex]) => {
+    const pane = map.createPane(key);
+    pane.style.zIndex = zIndex;
+  });
+}
+
 async function loadLayer(map, key) {
   const response = await fetch(DATA_FILES[key]);
   if (!response.ok) {
     throw new Error(`Failed to fetch ${DATA_FILES[key]}: ${response.status}`);
   }
   const geojson = await response.json();
-  const dataLayer = L.geoJSON(geojson, { style: styleForLayer(key) });
+  const dataLayer = L.geoJSON(geojson, { style: styleForLayer(key), pane: key });
   // The layer may have been toggled off while it was still loading, so honour
   // the checkbox's current state instead of always attaching. Layers default
   // to visible if the checkbox isn't present for any reason.
@@ -106,6 +120,7 @@ function initLegend() {
 let searchMarker = null;
 let searchDebounceTimer = null;
 let searchRequestToken = 0;
+let searchAbortController = null;
 
 function initSearch(map) {
   const input = document.getElementById('search-input');
@@ -170,8 +185,16 @@ function initSearch(map) {
 
   const runSearch = async (query) => {
     const token = ++searchRequestToken;
+    // Cancel any still-in-flight request before starting a new one, so we
+    // never have more than one Nominatim request outstanding at a time —
+    // the token alone stops a stale response from updating the UI, but does
+    // nothing to stop the request itself from going out over the network.
+    if (searchAbortController) {
+      searchAbortController.abort();
+    }
+    searchAbortController = new AbortController();
     try {
-      const response = await fetch(buildNominatimUrl(query));
+      const response = await fetch(buildNominatimUrl(query), { signal: searchAbortController.signal });
       if (!response.ok) {
         throw new Error(`Nominatim request failed: ${response.status}`);
       }
@@ -185,6 +208,7 @@ function initSearch(map) {
       hideError();
       renderResults(results);
     } catch (err) {
+      if (err.name === 'AbortError') return; // we cancelled this one ourselves, not a real failure
       if (token !== searchRequestToken) return;
       console.error(err);
       clearResults();
@@ -258,11 +282,11 @@ function initMap() {
   }).addTo(map);
 
   // Hand the overlays to Leaflet's own control stack so it reflows its
-  // controls (zoom, attribution) around them, instead of them sitting on
-  // top of each other — the same lesson learned the hard way with Google
-  // Maps' controls, applied up front this time.
+  // controls (zoom, attribution) around them instead of them overlapping.
   addDomAsControl('topleft', 'search-box');
   addDomAsControl('bottomleft', 'legend');
+
+  initPanes(map);
 
   loadAllLayers(map).then((failedLayers) => {
     if (failedLayers.length > 0) {
